@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>치공구 재고조회</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{
+    --bg:#EDEFF2; --panel:#FFFFFF; --ink:#1B2A3D; --ink-soft:#4C5A6E;
+    --line:#C7CDD6; --line-soft:#DEE2E8; --accent:#D9822B; --accent-soft:#F6E2C8;
+    --danger:#C0392B; --danger-soft:#F7DEDB; --ok:#2E7D5B; --ok-soft:#DCEEE5;
+    --mono:'JetBrains Mono', ui-monospace, monospace;
+    --disp:'Oswald', sans-serif; --body:'Inter', sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--bg); color:var(--ink); font-family:var(--body); font-size:15px;}
+  .app{max-width:560px; margin:0 auto; padding:20px 16px 60px;}
+
+  header.top{border-bottom:3px solid var(--ink); padding-bottom:12px; margin-bottom:16px;}
+  header.top .title{font-family:var(--disp); font-weight:700; font-size:22px; letter-spacing:0.3px; text-transform:uppercase;}
+  header.top .sub{font-family:var(--mono); font-size:11px; color:var(--ink-soft); margin-top:2px;}
+
+  .search-box{position:relative; margin-bottom:14px;}
+  .search-box input{
+    width:100%; font-family:var(--body); font-size:16px; padding:14px 14px;
+    border:1px solid var(--line); border-radius:2px; background:#fff; color:var(--ink);
+  }
+  .search-box input:focus{outline:2px solid var(--accent); outline-offset:1px; border-color:var(--accent);}
+
+  .updated-note{font-family:var(--mono); font-size:11px; color:var(--ink-soft); margin-bottom:14px;}
+
+  .result-list{display:flex; flex-direction:column; gap:8px;}
+  .result-card{
+    background:var(--panel); border:1px solid var(--line); border-left:4px solid var(--ink);
+    padding:12px 14px; display:flex; justify-content:space-between; align-items:center; gap:10px; cursor:pointer;
+  }
+  .result-card:active{background:#F7F8FA;}
+  .result-card.low{border-left-color:var(--danger);}
+  .rc-main{min-width:0;}
+  .rc-name{font-size:14px; font-weight:600; color:var(--ink);}
+  .rc-spec{font-size:12px; color:var(--ink-soft); margin-top:2px;}
+  .rc-code{font-family:var(--mono); font-size:10px; color:var(--ink-soft); margin-top:3px;}
+  .rc-stock{text-align:right; flex-shrink:0;}
+  .rc-stock .n{font-family:var(--disp); font-size:22px; font-weight:600; line-height:1;}
+  .rc-stock .n.low{color:var(--danger);}
+  .rc-stock .n.ok{color:var(--ok);}
+  .rc-stock .u{font-size:10px; color:var(--ink-soft);}
+
+  .empty{padding:50px 20px; text-align:center; color:var(--ink-soft); font-size:13px;}
+  .empty b{color:var(--ink); display:block; font-family:var(--disp); font-size:15px; margin-bottom:6px; text-transform:uppercase;}
+
+  /* ---- detail view ---- */
+  .detail-back{
+    display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--ink-soft);
+    text-decoration:none; margin-bottom:16px; cursor:pointer; background:none; border:none; font-family:var(--body); padding:0;
+  }
+  .detail-card{background:var(--panel); border:1px solid var(--line); border-top:5px solid var(--ink); padding:22px 20px;}
+  .detail-card.low{border-top-color:var(--danger);}
+  .detail-name{font-family:var(--disp); font-size:22px; font-weight:600; text-transform:uppercase;}
+  .detail-spec{font-size:14px; color:var(--ink-soft); margin-top:4px;}
+  .detail-code{font-family:var(--mono); font-size:12px; color:var(--ink-soft); margin-top:8px;}
+  .detail-stock{margin-top:22px; padding-top:20px; border-top:1px solid var(--line-soft); display:flex; align-items:baseline; gap:10px;}
+  .detail-stock .n{font-family:var(--disp); font-size:56px; font-weight:700; line-height:1;}
+  .detail-stock .n.low{color:var(--danger);}
+  .detail-stock .n.ok{color:var(--ok);}
+  .detail-stock .u{font-size:15px; color:var(--ink-soft);}
+  .detail-badge{
+    display:inline-block; margin-top:12px; padding:4px 10px; font-size:12px; font-weight:700;
+    border-radius:2px; font-family:var(--mono);
+  }
+  .detail-badge.low{background:var(--danger-soft); color:var(--danger);}
+  .detail-badge.ok{background:var(--ok-soft); color:var(--ok);}
+  .detail-meta{margin-top:18px; display:grid; grid-template-columns:1fr 1fr; gap:10px; font-size:13px;}
+  .detail-meta div span{display:block; font-size:11px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:0.4px; margin-bottom:2px;}
+
+  /* ---- admin ---- */
+  .admin-toggle{
+    display:block; text-align:center; margin-top:36px; font-size:11px; color:var(--line);
+    text-decoration:none; background:none; border:none; cursor:pointer; font-family:var(--body);
+  }
+  .admin-panel{display:none; margin-top:16px; border-top:2px dashed var(--line); padding-top:16px;}
+  .admin-panel.active{display:block;}
+  .admin-panel h2{font-family:var(--disp); font-size:14px; text-transform:uppercase; letter-spacing:0.4px; margin:0 0 10px;}
+  .admin-row{display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-bottom:12px;}
+  button.btn{
+    font-family:var(--body); font-weight:600; font-size:13px; cursor:pointer;
+    border:1px solid var(--ink); background:var(--ink); color:#fff; padding:9px 16px; border-radius:2px;
+  }
+  button.btn.ghost{background:transparent; color:var(--ink); border:1px solid var(--line);}
+  button.btn.accent{background:var(--accent); border-color:var(--accent);}
+  button.btn.sm{padding:6px 12px; font-size:12px;}
+  .admin-msg{font-size:12px; color:var(--ink-soft); font-family:var(--mono);}
+  .admin-panel input[type=text]{
+    font-family:var(--body); font-size:13px; padding:8px 10px; border:1px solid var(--line); border-radius:2px; width:100%;
+  }
+  .admin-note{font-size:12px; color:var(--ink-soft); line-height:1.6; margin-bottom:12px;}
+  .qr-list{max-height:260px; overflow-y:auto; border:1px solid var(--line); background:#fff;}
+  .qr-list-row{display:flex; justify-content:space-between; align-items:center; padding:8px 12px; border-bottom:1px solid var(--line-soft); font-size:12px;}
+  .qr-list-row:last-child{border-bottom:none;}
+  .qr-list-row .n{flex:1; min-width:0;}
+  .qr-list-row .n b{display:block; font-size:13px;}
+  .qr-list-row .n span{font-family:var(--mono); color:var(--ink-soft); font-size:11px;}
+
+  #qr-hidden-render{position:absolute; left:-9999px; top:-9999px;}
+
+  @media print{ body *{visibility:hidden;} }
+</style>
+</head>
+<body>
+<div class="app" id="view-root">
+
+  <header class="top">
+    <div class="title">치공구 재고조회</div>
+    <div class="sub">품질실 수납함 QR 스캔 · 실시간 재고 확인</div>
+  </header>
+
+  <!-- ============ SEARCH VIEW ============ -->
+  <div id="view-search">
+    <div class="search-box">
+      <input type="text" id="q" placeholder="공구명 또는 규격으로 검색" autocomplete="off">
+    </div>
+    <div class="updated-note" id="updated-note"></div>
+    <div class="result-list" id="result-list"></div>
+  </div>
+
+  <!-- ============ DETAIL VIEW ============ -->
+  <div id="view-detail" style="display:none;">
+    <button class="detail-back" id="btn-back">&larr; 검색으로</button>
+    <div id="detail-content"></div>
+  </div>
+
+  <button class="admin-toggle" id="admin-toggle">관리자 모드</button>
+  <div class="admin-panel" id="admin-panel">
+    <h2>데이터 갱신 (사무실 전용)</h2>
+    <p class="admin-note">
+      "절삭공구 재고관리" 앱에서 <b>엑셀로 저장</b>한 파일을 그대로 불러오면 됩니다.<br>
+      불러온 뒤 <b>페이지 파일 저장</b>을 누르면 최신 재고가 반영된 이 페이지 파일이 새로 다운로드됩니다.<br>
+      그 파일을 GitHub Pages(배포 위치)에 업로드해 기존 파일을 덮어쓰면, QR을 스캔하는 모든 사람에게 최신 재고가 보입니다.
+    </p>
+    <div class="admin-row">
+      <button class="btn ghost sm" id="btn-import">📂 엑셀 불러오기</button>
+      <input type="file" id="file-input" accept=".xlsx" style="display:none">
+      <button class="btn accent sm" id="btn-save-page">💾 페이지 파일 저장</button>
+    </div>
+    <div class="admin-msg" id="admin-msg"></div>
+
+    <h2 style="margin-top:22px;">QR 코드 생성</h2>
+    <p class="admin-note">
+      이 조회 페이지 전체로 연결되는 QR 하나를 만듭니다. 수납함마다 이 QR을 붙여두면,<br>
+      작업자가 스캔했을 때 검색창이 바로 뜨고 공구명·규격으로 원하는 공구를 찾아볼 수 있습니다.<br>
+      페이지 배포 주소를 아래에 입력하세요 (예: https://회사.github.io/치공구재고).
+    </p>
+    <div class="admin-row">
+      <input type="text" id="base-url" placeholder="https://... (배포된 페이지 주소, 마지막 / 제외)">
+    </div>
+    <div class="admin-row">
+      <button class="btn ghost sm" id="btn-make-qr">📱 QR 만들기</button>
+      <button class="btn ghost sm" id="btn-download-qr" style="display:none;">⬇️ QR 이미지 저장</button>
+    </div>
+    <div id="qr-preview" style="text-align:center; padding:12px 0;"></div>
+  </div>
+
+</div>
+
+<div id="qr-hidden-render"></div>
+
+<script>
+(function(){
+  "use strict";
+  const $ = sel => document.querySelector(sel);
+  const $$ = sel => Array.from(document.querySelectorAll(sel));
+
+  /* ---------------- BAKED DATA ---------------- */
+  /* DATA_START */
+  let DATA = {"tools":[],"updatedAt":null};
+  /* DATA_END */
+
+  function fmt(n){ return Number(n||0).toLocaleString('ko-KR'); }
+  function isLow(t){ return Number(t.stock) <= Number(t.min); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  function updatedNote(){
+    if(!DATA.updatedAt) return '⚠ 아직 재고 데이터가 없습니다. 관리자 모드에서 엑셀을 불러와 주세요.';
+    const d = new Date(DATA.updatedAt);
+    return '최종 갱신: ' + d.toLocaleString('ko-KR');
+  }
+
+  /* ---------------- SEARCH VIEW ---------------- */
+  function renderResults(){
+    const q = $('#q').value.trim().toLowerCase();
+    $('#updated-note').textContent = updatedNote();
+    let rows = DATA.tools;
+    if(q){
+      rows = rows.filter(t =>
+        (t.name||'').toLowerCase().includes(q) ||
+        (t.spec||'').toLowerCase().includes(q) ||
+        (t.code||'').toLowerCase().includes(q)
+      );
+    }
+    const list = $('#result-list');
+    if(!DATA.tools.length){
+      list.innerHTML = `<div class="empty"><b>등록된 공구가 없습니다</b>관리자 모드에서 재고 엑셀을 불러와 주세요.</div>`;
+      return;
+    }
+    if(!rows.length){
+      list.innerHTML = `<div class="empty"><b>검색 결과 없음</b>다른 이름이나 규격으로 검색해 보세요.</div>`;
+      return;
+    }
+    $('#updated-note').textContent = updatedNote() + ' · ' + rows.length + '개 표시 (전체 ' + DATA.tools.length + '개)';
+    list.innerHTML = rows.map(t=>{
+      const low = isLow(t);
+      return `<div class="result-card ${low?'low':''}" data-code="${esc(t.code)}">
+        <div class="rc-main">
+          <div class="rc-name">${esc(t.name)}</div>
+          <div class="rc-spec">${esc(t.spec)}${t.loc?(' · '+esc(t.loc)):''}</div>
+          <div class="rc-code">${esc(t.code)}</div>
+        </div>
+        <div class="rc-stock">
+          <div class="n ${low?'low':'ok'}">${fmt(t.stock)}</div>
+          <div class="u">${esc(t.unit||'EA')}</div>
+        </div>
+      </div>`;
+    }).join('');
+    $$('.result-card').forEach(el=>{
+      el.addEventListener('click', ()=> goToDetail(el.dataset.code));
+    });
+  }
+
+  /* ---------------- DETAIL VIEW ---------------- */
+  function findTool(code){
+    return DATA.tools.find(t => String(t.code||'').toLowerCase() === String(code||'').toLowerCase());
+  }
+
+  function renderDetail(code){
+    const t = findTool(code);
+    const box = $('#detail-content');
+    if(!t){
+      box.innerHTML = `<div class="empty"><b>공구를 찾을 수 없습니다</b>코드 "${esc(code)}"가 등록되어 있지 않습니다.</div>`;
+      return;
+    }
+    const low = isLow(t);
+    box.innerHTML = `
+      <div class="detail-card ${low?'low':''}">
+        <div class="detail-name">${esc(t.name)}</div>
+        <div class="detail-spec">${esc(t.spec)}</div>
+        <div class="detail-code">${esc(t.code)}</div>
+        <div class="detail-stock">
+          <div class="n ${low?'low':'ok'}">${fmt(t.stock)}</div>
+          <div class="u">${esc(t.unit||'EA')} 재고</div>
+        </div>
+        <div class="detail-badge ${low?'low':'ok'}">${low?'재고 부족':'재고 충분'}</div>
+        <div class="detail-meta">
+          <div><span>보관위치</span>${esc(t.loc||'-')}</div>
+          <div><span>최소재고</span>${fmt(t.min)} ${esc(t.unit||'EA')}</div>
+          <div><span>구분</span>${esc(t.cat||'-')}</div>
+          <div><span>관리방식</span>${esc(t.mode||'소모성')}</div>
+        </div>
+      </div>`;
+  }
+
+  function goToDetail(code){
+    const url = new URL(location.href);
+    url.searchParams.set('code', code);
+    history.pushState({code}, '', url);
+    showDetail(code);
+  }
+  function showDetail(code){
+    $('#view-search').style.display = 'none';
+    $('#view-detail').style.display = 'block';
+    renderDetail(code);
+  }
+  function showSearch(){
+    $('#view-detail').style.display = 'none';
+    $('#view-search').style.display = 'block';
+    renderResults();
+  }
+  $('#btn-back').addEventListener('click', ()=>{
+    const url = new URL(location.href);
+    url.searchParams.delete('code');
+    history.pushState({}, '', url);
+    showSearch();
+  });
+  window.addEventListener('popstate', ()=>{
+    const code = new URLSearchParams(location.search).get('code');
+    if(code) showDetail(code); else showSearch();
+  });
+
+  $('#q').addEventListener('input', renderResults);
+
+  /* ---------------- ADMIN: EXCEL IMPORT ---------------- */
+  $('#admin-toggle').addEventListener('click', ()=>{
+    $('#admin-panel').classList.toggle('active');
+  });
+
+  $('#btn-import').addEventListener('click', ()=> $('#file-input').click());
+  $('#file-input').addEventListener('change', e=>{
+    const file = e.target.files[0];
+    if(!file) return;
+    const reader = new FileReader();
+    reader.onload = evt=>{
+      try{
+        const wb = XLSX.read(evt.target.result, {type:'array'});
+        if(!wb.Sheets['공구마스터']){
+          alert('파일에서 "공구마스터" 시트를 찾지 못했습니다. 절삭공구 재고관리 앱에서 내보낸 엑셀 파일인지 확인하세요.');
+          return;
+        }
+        const tools = [];
+        XLSX.utils.sheet_to_json(wb.Sheets['공구마스터']).forEach(r=>{
+          const code = String(r.코드||'').trim();
+          if(!code) return;
+          tools.push({
+            code, name:String(r.품명||''), spec:String(r.규격||''),
+            cat:String(r.구분||'기타'), mode:(String(r.관리방식||'소모성')==='반납성'?'반납성':'소모성'),
+            loc:String(r.보관위치||''),
+            stock:Number(r.현재고)||0, min:Number(r.최소재고)||0, unit:String(r.단위||'EA')
+          });
+        });
+        DATA = { tools, updatedAt: new Date().toISOString() };
+        $('#admin-msg').textContent = '✓ 불러오기 완료: 공구 ' + tools.length + '건 (아직 저장 전 · "페이지 파일 저장"을 눌러야 배포용 파일이 만들어집니다)';
+        renderResults();
+      }catch(err){
+        alert('파일을 읽는 중 오류가 발생했습니다: ' + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = '';
+  });
+
+  /* ---------------- ADMIN: BAKE & SAVE PAGE ---------------- */
+  $('#btn-save-page').addEventListener('click', ()=>{
+    if(!DATA.tools.length){ alert('먼저 엑셀을 불러와 주세요.'); return; }
+    const html = document.documentElement.outerHTML;
+    const dataJson = JSON.stringify(DATA).replace(/<\/script/gi, '<\\/script');
+    const newHtml = '<!DOCTYPE html>\n' + html.replace(
+      /\/\* DATA_START \*\/[\s\S]*?\/\* DATA_END \*\//,
+      '/* DATA_START */\n  let DATA = ' + dataJson + ';\n  /* DATA_END */'
+    );
+    const blob = new Blob([newHtml], {type:'text/html'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = '치공구_재고조회.html';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    $('#admin-msg').textContent = '✓ 파일 저장 완료 — 이 파일을 배포 위치에 업로드(덮어쓰기)하세요';
+  });
+
+  /* ---------------- ADMIN: SINGLE QR FOR WHOLE PAGE ---------------- */
+  function baseUrl(){
+    const v = $('#base-url').value.trim();
+    if(v) return v.replace(/\/$/,'');
+    return location.href.split('?')[0].replace(/\/$/,'');
+  }
+
+  function makeQrDataUrl(text, size){
+    const holder = document.getElementById('qr-hidden-render');
+    holder.innerHTML = '';
+    new QRCode(holder, { text, width:size, height:size, correctLevel: QRCode.CorrectLevel.M });
+    const canvas = holder.querySelector('canvas');
+    return canvas ? canvas.toDataURL('image/png') : '';
+  }
+
+  let lastQrUrl = '';
+  $('#btn-make-qr').addEventListener('click', ()=>{
+    const url = baseUrl();
+    const png = makeQrDataUrl(url, 320);
+    lastQrUrl = png;
+    $('#qr-preview').innerHTML = `<img src="${png}" width="200" height="200"><div style="font-family:var(--mono); font-size:11px; color:var(--ink-soft); margin-top:8px; word-break:break-all;">${esc(url)}</div>`;
+    $('#btn-download-qr').style.display = 'inline-block';
+  });
+  $('#btn-download-qr').addEventListener('click', ()=>{
+    if(!lastQrUrl) return;
+    const a = document.createElement('a');
+    a.href = lastQrUrl; a.download = '치공구재고조회_QR.png';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  });
+
+  /* ---------------- INIT ---------------- */
+  const initCode = new URLSearchParams(location.search).get('code');
+  if(initCode) showDetail(initCode); else showSearch();
+})();
+</script>
+</body>
+</html>
