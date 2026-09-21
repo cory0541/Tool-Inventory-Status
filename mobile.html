@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>절삭공구 모바일 간편 입력</title>
+<style>
+  :root {
+    --primary: #1B2A3D;
+    --accent: #D9822B;
+    --bg: #F4F6F8;
+    --card: #FFFFFF;
+    --line: #D1D5DB;
+    --text: #111827;
+    --loc-blue: #0284C7;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  body { background: var(--bg); color: var(--text); padding: 14px; display: flex; justify-content: center; }
+  .container { width: 100%; max-width: 480px; background: var(--card); border-radius: 12px; padding: 18px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+  
+  header { border-bottom: 2px solid var(--primary); padding-bottom: 10px; margin-bottom: 16px; }
+  header h2 { font-size: 18px; color: var(--primary); display: flex; justify-content: space-between; align-items: center; }
+  header span { font-size: 11px; font-weight: normal; color: #6B7280; }
+
+  .form-group { margin-bottom: 14px; position: relative; }
+  label { display: block; font-size: 12px; font-weight: 700; color: #4B5563; margin-bottom: 6px; }
+  
+  .date-row { display: flex; gap: 8px; }
+  .date-row input[type="date"] { flex: 1; }
+  .btn-now {
+    background: #E5E7EB; border: 1.5px solid var(--line); border-radius: 6px;
+    padding: 0 16px; font-size: 13px; font-weight: 700; color: var(--primary);
+    cursor: pointer; white-space: nowrap;
+  }
+  .btn-now:active { background: #D1D5DB; }
+
+  .type-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+  .type-btn {
+    background: #fff; border: 1.5px solid var(--line); border-radius: 6px; padding: 12px 4px;
+    font-size: 14px; font-weight: 700; text-align: center; cursor: pointer; transition: all 0.15s;
+  }
+  .type-btn.active { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+  .search-wrapper { position: relative; }
+  input {
+    width: 100%; padding: 12px 10px; font-size: 15px; border: 1.5px solid var(--line);
+    border-radius: 6px; outline: none; background: #fff;
+  }
+  input:focus { border-color: var(--accent); }
+  
+  .search-dropdown {
+    display: none; position: absolute; top: 100%; left: 0; right: 0; max-height: 250px;
+    overflow-y: auto; background: #fff; border: 1.5px solid var(--accent); border-top: none;
+    border-radius: 0 0 6px 6px; z-index: 50; box-shadow: 0 8px 16px rgba(0,0,0,0.14);
+  }
+  .search-item {
+    padding: 10px 12px; border-bottom: 1px solid #F3F4F6; cursor: pointer; font-size: 13px;
+  }
+  .search-item:active { background: #FDE8D3; }
+  .search-item .code-badge { font-family: monospace; font-weight: 700; color: var(--primary); margin-right: 4px; }
+  .search-item .stock-info {
+    font-size: 11px; color: #6B7280; margin-top: 4px; display: flex; justify-content: space-between; align-items: center;
+  }
+  
+  .loc-badge {
+    background: #E0F2FE; color: var(--loc-blue); padding: 2px 7px;
+    border-radius: 4px; font-size: 11px; font-weight: 700;
+  }
+
+  .selected-tool-box {
+    display: none; background: #F0FDF4; border: 1.5px solid #86EFAC; border-radius: 8px;
+    padding: 12px; margin-top: 6px; font-size: 13px;
+  }
+  .selected-tool-box b { color: #166534; }
+  .loc-highlight {
+    margin-top: 8px; padding-top: 8px; border-top: 1px dashed #86EFAC;
+    font-size: 14px; font-weight: 700; color: var(--loc-blue);
+  }
+  .loc-highlight span.detail-box {
+    background: #0284C7; color: #fff; padding: 2px 6px; border-radius: 4px; margin-left: 4px; font-family: monospace;
+  }
+  .reset-link {
+    font-size: 11px; color: #DC2626; text-decoration: underline; margin-left: 8px; cursor: pointer;
+  }
+
+  .qty-box { display: flex; gap: 8px; }
+  .qty-btn { width: 50px; background: #E5E7EB; border: none; border-radius: 6px; font-size: 20px; font-weight: bold; cursor: pointer; }
+  .qty-btn:active { background: #D1D5DB; }
+  .qty-input { text-align: center; font-weight: 700; font-size: 18px; flex: 1; }
+
+  .submit-btn {
+    width: 100%; background: var(--accent); color: #fff; border: none; border-radius: 8px;
+    padding: 16px; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 10px;
+    box-shadow: 0 4px 6px rgba(217, 130, 43, 0.25);
+  }
+  .submit-btn:disabled { background: #9CA3AF; cursor: not-allowed; }
+
+  #msg { text-align: center; margin-top: 10px; font-size: 13px; font-weight: 600; min-height: 20px; }
+  .status-tag { font-size: 11px; text-align: right; color: #6B7280; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <h2>절삭공구 현장 입력 <span>모바일 전용</span></h2>
+    <div class="status-tag" id="sync-status">연결 확인 중...</div>
+  </header>
+
+  <!-- 1. 일자 선택 및 [지금] 버튼 -->
+  <div class="form-group">
+    <label>1. 일자 *</label>
+    <div class="date-row">
+      <input type="date" id="txn-date">
+      <button type="button" class="btn-now" onclick="setTodayDate()">지금</button>
+    </div>
+  </div>
+
+  <!-- 2. 작업 구분 (출고(소모), 대여, 반납) -->
+  <div class="form-group">
+    <label>2. 작업 구분 *</label>
+    <div class="type-grid" id="type-group">
+      <div class="type-btn active" data-val="출고">출고 (소모)</div>
+      <div class="type-btn" data-val="대여">대여</div>
+      <div class="type-btn" data-val="반납">반납</div>
+    </div>
+  </div>
+
+  <!-- 3. 공구 검색 및 선택 (정확한 위치 실시간 검색 지원) -->
+  <div class="form-group">
+    <label>3. 공구 선택 (클릭 시 전체 목록 / 입력 시 검색) *</label>
+    <div class="search-wrapper">
+      <input type="text" id="tool-search" placeholder="공구명, 규격, 또는 정확한 위치(예: C3, B2) 검색..." autocomplete="off">
+      <input type="hidden" id="selected-code">
+      <div class="search-dropdown" id="search-dropdown"></div>
+    </div>
+    <!-- 공구 선택 완료 시 나타나는 상세 정보 카드 -->
+    <div class="selected-tool-box" id="selected-tool-box">
+      <div id="selected-tool-text"></div>
+      <div class="loc-highlight" id="selected-tool-loc"></div>
+      <div style="text-align: right; margin-top: 4px;">
+        <span class="reset-link" onclick="resetToolSelect()">다시 선택</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 4. 수량 -->
+  <div class="form-group">
+    <label>4. 수량 *</label>
+    <div class="qty-box">
+      <button type="button" class="qty-btn" onclick="adjustQty(-1)">-</button>
+      <input type="number" id="qty" class="qty-input" value="1" min="1">
+      <button type="button" class="qty-btn" onclick="adjustQty(1)">+</button>
+    </div>
+  </div>
+
+  <!-- 5. 작업자 성함 -->
+  <div class="form-group">
+    <label>5. 작업자 성함 *</label>
+    <input type="text" id="worker" placeholder="성함을 입력하세요">
+  </div>
+
+  <!-- 6. 비고 -->
+  <div class="form-group">
+    <label>6. 비고 (선택사항)</label>
+    <input type="text" id="memo" placeholder="파손 사유, 특이사항 등">
+  </div>
+
+  <!-- 제출 버튼 -->
+  <button type="button" class="submit-btn" id="btn-submit" onclick="submitTxn()">등록하기</button>
+  <div id="msg"></div>
+</div>
+
+<script>
+  // 구글 앱스스크립트 배포 웹앱 주소
+  const API_URL = 'https://script.google.com/macros/s/AKfycbzMUNo_aWdnXJSFOIVAmAMOgglBObTJ0uZl_BrK8mcVxBQ7aHtxGE9Y9Z5vf7UHHUqk2g/exec';
+
+  let selectedType = '출고';
+  let toolsData = [];
+
+  function setTodayDate() {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, '0');
+    const day = String(today.getDate()).padStart(2, '0');
+    document.getElementById('txn-date').value = `${year}-${month}-${day}`;
+  }
+
+  document.querySelectorAll('.type-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      selectedType = btn.dataset.val;
+    });
+  });
+
+  function adjustQty(delta) {
+    const input = document.getElementById('qty');
+    let val = parseInt(input.value || 1, 10) + delta;
+    if (val < 1) val = 1;
+    input.value = val;
+  }
+
+  // 보관위치(loc)와 정확한위치(locDetail) 통합 포맷팅
+  function formatLocation(t) {
+    const loc = (t.loc || '').trim();
+    const detail = (t.locDetail || t['정확한위치'] || t['정확한 위치'] || '').trim();
+    if (loc && detail) return `${loc} (${detail})`;
+    if (detail) return detail;
+    if (loc) return loc;
+    return '위치 미지정';
+  }
+
+  async function loadTools() {
+    const status = document.getElementById('sync-status');
+    try {
+      const res = await fetch(API_URL + '?type=master', { cache: 'no-store' });
+      const data = await res.json();
+      if (data.ok && Array.isArray(data.tools)) {
+        toolsData = data.tools;
+        status.textContent = '🟢 시트 연결됨 (' + toolsData.length + '개 공구)';
+      } else {
+        status.textContent = '⚠ 목록 로드 실패';
+      }
+    } catch (e) {
+      status.textContent = '⚠ 연결 오류 (오프라인)';
+    }
+  }
+
+  const searchInput = document.getElementById('tool-search');
+  const dropdown = document.getElementById('search-dropdown');
+
+  function renderDropdown(filterText = '') {
+    const q = filterText.toLowerCase().trim();
+    let matches = toolsData;
+
+    if (q) {
+      matches = toolsData.filter(t => {
+        const fullLoc = formatLocation(t).toLowerCase();
+        return String(t.code || '').toLowerCase().includes(q) ||
+               String(t.name || '').toLowerCase().includes(q) ||
+               String(t.spec || '').toLowerCase().includes(q) ||
+               String(t.locDetail || '').toLowerCase().includes(q) ||
+               fullLoc.includes(q);
+      });
+    }
+
+    if (matches.length === 0) {
+      dropdown.innerHTML = '<div style="padding:12px; font-size:12px; color:#6B7280; text-align:center;">일치하는 공구가 없습니다.</div>';
+    } else {
+      dropdown.innerHTML = matches.map(t => {
+        const locStr = formatLocation(t);
+        return `
+          <div class="search-item" onclick="selectTool('${t.code}')">
+            <div><span class="code-badge">[${t.code}]</span> <b>${t.name}</b></div>
+            <div class="stock-info">
+              <span>${t.spec || '규격 없음'} · 재고: <b>${t.stock}</b>${t.unit || 'EA'}</span>
+              <span class="loc-badge">📍 ${locStr}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+    dropdown.style.display = 'block';
+  }
+
+  searchInput.addEventListener('focus', () => renderDropdown(searchInput.value));
+  searchInput.addEventListener('click', () => renderDropdown(searchInput.value));
+  searchInput.addEventListener('input', () => renderDropdown(searchInput.value));
+
+  document.addEventListener('click', (e) => {
+    if (!e.target.closest('.search-wrapper')) {
+      dropdown.style.display = 'none';
+    }
+  });
+
+  function selectTool(code) {
+    const tool = toolsData.find(t => t.code === code);
+    if (!tool) return;
+
+    document.getElementById('selected-code').value = tool.code;
+    searchInput.style.display = 'none';
+    dropdown.style.display = 'none';
+
+    const box = document.getElementById('selected-tool-box');
+    const text = document.getElementById('selected-tool-text');
+    const locText = document.getElementById('selected-tool-loc');
+
+    text.innerHTML = `선택: <b>[${tool.code}] ${tool.name}</b> (${tool.spec || ''})<br><span style="font-size:11px; color:#15803D;">현재고: ${tool.stock}${tool.unit || 'EA'}</span>`;
+    
+    const locBase = tool.loc ? tool.loc : '미지정';
+    const detail = (tool.locDetail || tool['정확한위치'] || tool['정확한 위치'] || '').trim();
+    
+    if (detail) {
+      locText.innerHTML = `📍 위치: <b>${locBase}</b> ➔ <span class="detail-box">${detail}</span>`;
+    } else {
+      locText.innerHTML = `📍 위치: <b>${locBase}</b> (상세좌표 없음)`;
+    }
+    
+    box.style.display = 'block';
+  }
+
+  function resetToolSelect() {
+    document.getElementById('selected-code').value = '';
+    searchInput.value = '';
+    searchInput.style.display = 'block';
+    document.getElementById('selected-tool-box').style.display = 'none';
+    searchInput.focus();
+    renderDropdown('');
+  }
+
+  async function submitTxn() {
+    const dateVal = document.getElementById('txn-date').value;
+    const code = document.getElementById('selected-code').value;
+    const qty = parseInt(document.getElementById('qty').value, 10);
+    const worker = document.getElementById('worker').value.trim();
+    const memo = document.getElementById('memo').value.trim();
+    const msg = document.getElementById('msg');
+    const btn = document.getElementById('btn-submit');
+
+    if (!dateVal) { alert('일자를 선택해 주세요.'); return; }
+    if (!code) { alert('공구를 선택해 주세요.'); return; }
+    if (!worker) { alert('작업자 성함을 입력해 주세요.'); return; }
+    if (isNaN(qty) || qty < 1) { alert('수량을 1개 이상 입력해 주세요.'); return; }
+
+    const tool = toolsData.find(t => t.code === code);
+    let curStock = tool ? Number(tool.stock) : 0;
+    
+    let delta = 0;
+    if (selectedType === '반납') delta = qty;
+    else if (selectedType === '출고' || selectedType === '대여') delta = -qty;
+    const newStock = curStock + delta;
+
+    btn.disabled = true;
+    msg.style.color = '#4B5563';
+    msg.textContent = '구글 시트로 저장 중...';
+
+    const payload = {
+      action: 'txn',
+      txn: {
+        id: 'mob-' + Math.random().toString(36).slice(2, 9),
+        date: dateVal,
+        type: selectedType,
+        code: code,
+        qty: qty,
+        drawing: '',
+        equip: '',
+        worker: worker,
+        memo: memo
+      },
+      newStock: newStock
+    };
+
+    try {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+        body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+
+      if (json.ok) {
+        msg.style.color = '#10B981';
+        const displayLabel = selectedType === '출고' ? '출고(소모)' : selectedType;
+        msg.textContent = `✓ [${displayLabel}] ${qty}개 처리 완료! (${dateVal})`;
+        
+        resetToolSelect();
+        document.getElementById('qty').value = 1;
+        document.getElementById('memo').value = '';
+        setTodayDate();
+        loadTools();
+      } else {
+        msg.style.color = '#EF4444';
+        msg.textContent = '저장 실패: ' + (json.error || '알 수 없는 오류');
+      }
+    } catch (e) {
+      msg.style.color = '#EF4444';
+      msg.textContent = '통신 실패: ' + e.message;
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    setTodayDate();
+    loadTools();
+  });
+</script>
+
+</body>
+</html>
